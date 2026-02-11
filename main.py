@@ -23,6 +23,7 @@ from config import (
     UVICORN_SSL_KEYFILE,
     UVICORN_UDS,
     UVICORN_WORKERS,
+    UVICORN_BEHIND_PROXY
 )
 
 logger = get_logger("uvicorn-main")
@@ -116,22 +117,20 @@ if __name__ == "__main__":
 
     bind_args = {}
 
+    if UVICORN_UDS:
+        bind_args["uds"] = UVICORN_UDS
+    else:
+        bind_args["host"] = UVICORN_HOST
+        bind_args["port"] = UVICORN_PORT
+
     if UVICORN_SSL_CERTFILE and UVICORN_SSL_KEYFILE:
         validate_cert_and_key(UVICORN_SSL_CERTFILE, UVICORN_SSL_KEYFILE, ca_type=ca_type)
 
         bind_args["ssl_certfile"] = UVICORN_SSL_CERTFILE
         bind_args["ssl_keyfile"] = UVICORN_SSL_KEYFILE
 
-        if UVICORN_UDS:
-            bind_args["uds"] = UVICORN_UDS
-        else:
-            bind_args["host"] = UVICORN_HOST
-            bind_args["port"] = UVICORN_PORT
-
-    else:
-        if UVICORN_UDS:
-            bind_args["uds"] = UVICORN_UDS
-        else:
+    elif not UVICORN_UDS:
+        if not UVICORN_BEHIND_PROXY:
             ip = check_and_modify_ip(UVICORN_HOST)
 
             logger.warning(f"""
@@ -151,7 +150,8 @@ Then, navigate to {click.style(f"http://{ip}:{UVICORN_PORT}", bold=True)} on you
             """)
 
             bind_args["host"] = ip
-            bind_args["port"] = UVICORN_PORT
+        else:
+            print("You are running PasarGuard behind a proxy :)")
 
     if DEBUG:
         bind_args["uds"] = None
